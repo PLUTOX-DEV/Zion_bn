@@ -1,25 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
 const MenuItem = require("../models/Menu");
-
-// ⚙️ Multer storage config
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const dir = "uploads/";
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir);
-    cb(null, dir);
-  },
-  filename: function (req, file, cb) {
-    cb(
-      null,
-      `${Date.now()}_${file.originalname.replace(/\s+/g, "_")}`
-    );
-  },
-});
-const upload = multer({ storage });
 
 // 📥 GET all menu items
 router.get("/", async (req, res) => {
@@ -42,12 +23,12 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// ➕ POST new menu item
-router.post("/", upload.single("image"), async (req, res) => {
+// ➕ POST new menu item (JSON with imgUrl)
+router.post("/", async (req, res) => {
   try {
-    const { name, description, price } = req.body;
+    const { name, description, price, imgUrl } = req.body;
 
-    if (!name || !description || !price || !req.file) {
+    if (!name || !description || !price || !imgUrl) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
@@ -55,7 +36,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       name,
       description,
       price: parseFloat(price),
-      imgUrl: "/" + req.file.path.replace(/\\/g, "/"), // serve path
+      imgUrl, // already a URL string
     });
 
     const savedItem = await newItem.save();
@@ -70,14 +51,6 @@ router.delete("/:id", async (req, res) => {
   try {
     const item = await MenuItem.findById(req.params.id);
     if (!item) return res.status(404).json({ message: "Menu item not found" });
-
-    // Optionally delete image file
-    if (item.imgUrl) {
-      const imgPath = path.join(__dirname, "..", item.imgUrl);
-      if (fs.existsSync(imgPath)) {
-        fs.unlinkSync(imgPath);
-      }
-    }
 
     await item.deleteOne();
     res.json({ message: "Menu item deleted" });
